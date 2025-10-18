@@ -13,6 +13,9 @@ function getClient() {
 }
 
 export async function polishWithGemini(ideas: Idea[], context: { city: string; hangouts: string[]; peace: string }): Promise<Idea[]> {
+  console.log("🔮 GEMINI_API_KEY loaded:", !!process.env.GEMINI_API_KEY);
+  console.log("🔮 GEMINI_MODEL:", process.env.GEMINI_MODEL);
+  
   const c = getClient();
   if (!c) return ideas;
 
