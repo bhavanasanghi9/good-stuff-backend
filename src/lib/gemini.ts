@@ -13,8 +13,10 @@ function getClient() {
 }
 
 export async function polishWithGemini(ideas: Idea[], context: { city: string; hangouts: string[]; peace: string }): Promise<Idea[]> {
-  console.log("🔮 GEMINI_API_KEY loaded:", !!process.env.GEMINI_API_KEY);
+  console.log("🔮 Checking Gemini setup...");
   console.log("🔮 GEMINI_MODEL:", process.env.GEMINI_MODEL);
+  console.log("🔮 GEMINI_API_KEY exists:", !!process.env.GEMINI_API_KEY);
+  console.log("🔮 GEMINI_API_KEY starts with:", process.env.GEMINI_API_KEY?.slice(0, 6));
   
   const c = getClient();
   if (!c) return ideas;
