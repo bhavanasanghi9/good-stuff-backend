@@ -21,7 +21,7 @@ export async function polishWithGemini(ideas: Idea[], context: { city: string; h
   const c = getClient();
   if (!c) return ideas;
 
-  const modelName = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+  const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash";
   const model = c.getGenerativeModel({ model: modelName });
   const prompt = `You are helping a vibe-based matching app. Given a city, preferred hangout types, and three place-based date ideas, polish each idea with a 1–2 sentence warm summary and a tiny 3-step itinerary. Keep it light, inclusive, and practical. Return strict JSON with fields: ideas: [{title, summary, itinerary:[{time, activity, notes}]}]. Avoid flowery language and keep under 60 words per idea.`;
 
