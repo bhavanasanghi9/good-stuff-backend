@@ -1,5 +1,5 @@
 import { Router } from "express";
-import axios from "axios";
+import { z } from "zod";
 
 const router = Router();
 
@@ -9,65 +9,53 @@ const router = Router();
  * Body:
  * {
  *   userId: string,
- *   matchId: string,
- *   city: string
+ *   matchId: string
  * }
+ *
+ * MVP behavior:
+ * - Validate payload
+ * - Return success
+ *
+ * NOTE:
+ * If you later want to persist interest, add a DB insert here (Supabase table, etc.)
+ * WITHOUT changing the response shape.
  */
-router.post("/express-interest", async (req, res) => {
-  const { userId, matchId, city } = req.body as {
-    userId?: string;
-    matchId?: string;
-    city?: string;
-  };
 
-  if (!userId || !matchId || !city) {
+const schema = z.object({
+  userId: z.string().min(1),
+  matchId: z.string().min(1),
+});
+
+router.post("/express-interest", async (req, res) => {
+  const parse = schema.safeParse(req.body);
+  if (!parse.success) {
     return res.status(400).json({
-      error: "userId, matchId, and city are required",
+      error: "userId and matchId are required",
+      details: parse.error.issues,
     });
   }
 
+  const { userId, matchId } = parse.data;
+
   try {
-    // -----------------------------------------
-    // 1️⃣ Call Hangout Planner (existing route)
-    // -----------------------------------------
-    const hangoutRes = await axios.get(
-      "http://localhost:3000/api/hangout-planner",
-      {
-        params: { userId, matchId, city },
-      }
-    );
+    // ✅ MVP: record interest later if needed
+    // Example future (only if you create a table):
+    // await supabase.from("expressed_interests").insert({
+    //   user_id: userId,
+    //   match_id: matchId,
+    //   created_at: new Date().toISOString(),
+    // });
 
-    const hangoutIdeas = hangoutRes.data?.hangoutIdeas;
-
-    if (!hangoutIdeas || !Array.isArray(hangoutIdeas)) {
-      throw new Error("Invalid hangout planner response");
-    }
-
-    // -----------------------------------------
-    // 2️⃣ Call Location Mapper (existing route)
-    // -----------------------------------------
-    const locationRes = await axios.post(
-      "http://localhost:3000/api/location-mapper",
-      {
-        city,
-        ideas: hangoutIdeas.map((h: any) => ({
-          title: h["place name"] || h.placeName || h.title,
-          description: h.description,
-        })),
-      }
-    );
-
-    // -----------------------------------------
-    // 3️⃣ Return enriched plans
-    // -----------------------------------------
     return res.json({
       success: true,
-      hangoutPlans: locationRes.data.ideas,
+      userId,
+      matchId,
+      message: "Interest recorded",
     });
   } catch (err: any) {
-    console.error("❌ Express Interest failed:", err.message || err);
+    console.error("❌ Express Interest failed:", err?.message || err);
     return res.status(500).json({
-      error: err.message || "internal error",
+      error: err?.message || "internal error",
     });
   }
 });
