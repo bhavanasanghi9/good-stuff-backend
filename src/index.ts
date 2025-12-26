@@ -8,6 +8,7 @@ import fullMatchPlan from "./routes/fullMatchPlan.js";
 import matchDetails from "./routes/matchDetails.js";
 import { buildWhyMatched } from "./lib/whyMatched.js";
 import expressInterest from "./routes/expressInterest.js";
+import placePhotoRouter from "./routes/placePhoto.js";
 
 
 // ----------------------
@@ -21,6 +22,7 @@ app.use("/api", locationMapper);
 app.use("/api", fullMatchPlan);
 app.use("/api", matchDetails);
 app.use("/api", expressInterest);
+app.use("/api", placePhotoRouter);
 
 
 
