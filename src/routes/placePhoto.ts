@@ -4,7 +4,8 @@ import "dotenv/config";
 
 const router = Router();
 
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY!;
+// ✅ MUST match the key used everywhere else
+const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY!;
 
 /**
  * GET /api/place-photo?ref=PHOTO_REFERENCE
@@ -19,26 +20,28 @@ router.get("/place-photo", async (req, res) => {
   }
 
   try {
-    const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${encodeURIComponent(
-      ref
-    )}&key=${GOOGLE_API_KEY}`;
+    const googleUrl =
+      "https://maps.googleapis.com/maps/api/place/photo" +
+      `?maxwidth=800&photo_reference=${encodeURIComponent(ref)}` +
+      `&key=${GOOGLE_MAPS_API_KEY}`;
 
-    const response = await fetch(url);
+    const response = await fetch(googleUrl);
 
-    if (!response.ok) {
+    if (!response.ok || !response.body) {
+      console.error("❌ Google photo fetch failed:", response.status);
       return res.status(404).json({ error: "photo not found" });
     }
 
-    // Pass content-type through
-    const contentType = response.headers.get("content-type");
-    if (contentType) {
-      res.setHeader("Content-Type", contentType);
-    }
+    // ✅ Important: tell browser this is an image
+    res.setHeader(
+      "Content-Type",
+      response.headers.get("content-type") || "image/jpeg"
+    );
 
-    // Stream image directly
+    // ✅ Stream image bytes directly
     response.body.pipe(res);
   } catch (err: any) {
-    console.error("❌ Photo proxy failed:", err.message || err);
+    console.error("❌ Photo proxy failed:", err?.message || err);
     return res.status(500).json({ error: "failed to fetch photo" });
   }
 });
