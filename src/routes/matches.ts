@@ -208,6 +208,7 @@ router.get("/matches", async (req, res) => {
       id: m.id,
       name: m.name,
       age: m.age,
+      city: m.city,
       photo:
         m.photo_data_url ||
         "https://images.unsplash.com/photo-1517841905240-472988babdf9",
