@@ -14,6 +14,8 @@ export type Profile = {
   vibe_bio?: string | null;
 
   embedding?: number[] | null;
+  enriched_profile?: string | null;
+  city?: string | null;
 };
 
 
@@ -25,20 +27,23 @@ export async function upsertProfile(p: Profile) {
     const { error } = await supabase
       .from("profiles")
       .upsert(
-        {
-          id: p.id,
-          name: p.name || null,
-          photo_data_url: p.photo_data_url || null,
-          answers: p.answers || {},
-          enriched_profile: p.enriched_profile || null,
-          embedding: p.embedding || null, // array → vector handled by Supabase
-          city: p.city || null,
-          lat: p.lat || null,
-          lon: p.lon || null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "id" }
-      );
+  {
+    id: p.id,
+    name: p.name || null,
+    age: p.age || null,              // ✅ ADD THIS
+    photo_data_url: p.photo_data_url || null,
+    answers: p.answers || {},
+    vibe_bio: p.vibe_bio || null,    // ✅ ADD THIS
+    enriched_profile: p.enriched_profile || null,
+    embedding: p.embedding || null,
+    city: p.city || null,
+    lat: p.lat || null,
+    lon: p.lon || null,
+    updated_at: new Date().toISOString(),
+  },
+  { onConflict: "id" }
+);
+
 
     if (error) throw new Error("❌ upsertProfile failed: " + error.message);
 
