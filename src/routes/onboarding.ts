@@ -11,19 +11,17 @@ const router = Router();
    1️⃣ Schema
 ---------------------------------------- */
 const schema = z.object({
-  photoDataUrl: z.string().nullable().optional(),
-  name: z.string().nullable().optional(),
+  photoDataUrl: z.string().trim().nullable().optional(),
+  name: z.string().trim().nullable().optional(),
   age: z.number().int().min(18).max(99).optional(),
 
-  city: z.string().nullable().optional(),
-  state: z.string().nullable().optional(),
-  country: z.string().nullable().optional(),
+  city: z.string().trim().nullable().optional(),
+  state: z.string().trim().nullable().optional(),
+  country: z.string().trim().nullable().optional(),
 
   answers: z.object({
-    // filter-only
     intent: z.string(),
 
-    // used for embedding + summaries
     thrive: z.string(),
     conversationStyle: z.string(),
     recharge: z.string(),
@@ -42,7 +40,7 @@ const MODEL_ID = "models/gemini-2.5-flash";
    3️⃣ Helpers
 ---------------------------------------- */
 
-// TEXT USED FOR VECTOR EMBEDDING (matching only)
+// Used ONLY for vector embedding
 function buildEmbeddingText(a: any) {
   return [
     `Thrives when: ${a.thrive}`,
@@ -53,7 +51,7 @@ function buildEmbeddingText(a: any) {
   ].join("\n");
 }
 
-// SHORT CARD SUMMARY (1–2 sentences)
+// Short card summary (1–2 sentences)
 async function generateVibeBio(a: any) {
   if (!process.env.GEMINI_API_KEY) {
     return "Thoughtful, grounded, and values meaningful connection over surface-level interaction.";
@@ -89,7 +87,7 @@ Output ONLY the vibe bio text.
     : "Thoughtful, grounded, and values meaningful connection over surface-level interaction.";
 }
 
-// LONG PERSONALITY SUMMARY (used for reasoning + hangouts)
+// Long personality summary (used for hangouts + reasoning)
 async function generateEnrichedProfile(a: any) {
   if (!process.env.GEMINI_API_KEY) {
     return `
@@ -165,7 +163,7 @@ router.post("/onboarding", async (req, res) => {
   const userId = "u_" + Math.random().toString(36).slice(2, 10);
 
   /* -------------------------------
-     A) Create embedding
+     A) Embedding
   ------------------------------- */
   let embedding: number[];
   try {
@@ -176,7 +174,7 @@ router.post("/onboarding", async (req, res) => {
   }
 
   /* -------------------------------
-     B) Generate vibe bio
+     B) Vibe bio
   ------------------------------- */
   let vibeBio: string;
   try {
@@ -187,7 +185,7 @@ router.post("/onboarding", async (req, res) => {
   }
 
   /* -------------------------------
-     C) Generate enriched profile (CRITICAL FIX)
+     C) Enriched profile
   ------------------------------- */
   let enrichedProfile: string;
   try {
@@ -198,18 +196,23 @@ router.post("/onboarding", async (req, res) => {
   }
 
   /* -------------------------------
-     D) Persist profile
+     D) Persist profile (CRITICAL FIX)
   ------------------------------- */
   try {
     await upsertProfile({
       id: userId,
       name: name ?? null,
       age: age ?? null,
-      photo_data_url: photoDataUrl ?? null,
+
+      // 🔥 FIX: never store empty strings
+      photo_data_url:
+        photoDataUrl && photoDataUrl.length > 0
+          ? photoDataUrl
+          : null,
 
       answers,
-      vibe_bio: vibeBio,                 // short teaser
-      enriched_profile: enrichedProfile, // 🔥 REQUIRED FOR MATCH REASONING
+      vibe_bio: vibeBio,
+      enriched_profile: enrichedProfile,
 
       embedding,
       city: city ?? null,
