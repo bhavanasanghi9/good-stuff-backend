@@ -23,7 +23,7 @@ const schema = z.object({
     // filter-only
     intent: z.string(),
 
-    // embedded + summarized
+    // used for embedding + summaries
     thrive: z.string(),
     conversationStyle: z.string(),
     recharge: z.string(),
@@ -33,7 +33,7 @@ const schema = z.object({
 });
 
 /* ----------------------------------------
-   2️⃣ Gemini (vibe bio only)
+   2️⃣ Gemini setup
 ---------------------------------------- */
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const MODEL_ID = "models/gemini-2.5-flash";
@@ -42,7 +42,7 @@ const MODEL_ID = "models/gemini-2.5-flash";
    3️⃣ Helpers
 ---------------------------------------- */
 
-// used ONLY for vector embedding
+// TEXT USED FOR VECTOR EMBEDDING (matching only)
 function buildEmbeddingText(a: any) {
   return [
     `Thrives when: ${a.thrive}`,
@@ -53,7 +53,7 @@ function buildEmbeddingText(a: any) {
   ].join("\n");
 }
 
-// used ONLY for card display
+// SHORT CARD SUMMARY (1–2 sentences)
 async function generateVibeBio(a: any) {
   if (!process.env.GEMINI_API_KEY) {
     return "Thoughtful, grounded, and values meaningful connection over surface-level interaction.";
@@ -89,6 +89,57 @@ Output ONLY the vibe bio text.
     : "Thoughtful, grounded, and values meaningful connection over surface-level interaction.";
 }
 
+// LONG PERSONALITY SUMMARY (used for reasoning + hangouts)
+async function generateEnrichedProfile(a: any) {
+  if (!process.env.GEMINI_API_KEY) {
+    return `
+A thoughtful person who values meaningful connection and enjoys engaging conversations.
+They recharge intentionally, appreciate emotional depth, and feel most themselves
+when they can show up authentically with people they trust.
+`.trim();
+  }
+
+  const prompt = `
+You are writing a natural personality summary for a human connection app.
+
+Write ONE cohesive paragraph that captures:
+- personality
+- social energy
+- conversation style
+- how they like to spend time
+- emotional values
+
+Rules:
+- 60–120 words
+- Third person
+- Natural, warm, human tone
+- NO bullet points
+- NO headings
+- NO emojis
+- NO meta commentary
+
+Inputs:
+Thrives when: ${a.thrive}
+Conversation style: ${a.conversationStyle}
+Recharges by: ${a.recharge}
+Planning style: ${a.planningStyle}
+Feels most themselves when: ${a.feelMostYourself}
+
+Output ONLY the paragraph.
+`;
+
+  const model = genAI.getGenerativeModel({ model: MODEL_ID });
+  const result = await model.generateContent(prompt);
+  const text = result.response.text()?.trim();
+
+  return text?.length
+    ? text
+    : `
+A grounded and curious individual who values authentic interaction and enjoys
+forming meaningful connections through thoughtful conversation.
+`.trim();
+}
+
 /* ----------------------------------------
    4️⃣ Route
 ---------------------------------------- */
@@ -114,7 +165,7 @@ router.post("/onboarding", async (req, res) => {
   const userId = "u_" + Math.random().toString(36).slice(2, 10);
 
   /* -------------------------------
-     A) Embedding
+     A) Create embedding
   ------------------------------- */
   let embedding: number[];
   try {
@@ -125,43 +176,53 @@ router.post("/onboarding", async (req, res) => {
   }
 
   /* -------------------------------
-     B) Vibe bio
+     B) Generate vibe bio
   ------------------------------- */
   let vibeBio: string;
   try {
     vibeBio = await generateVibeBio(answers);
-  } catch (err) {
-    console.error("❌ Vibe bio failed:", err);
+  } catch {
     vibeBio =
       "Thoughtful, grounded, and values meaningful connection over surface-level interaction.";
   }
 
   /* -------------------------------
-     C) Persist profile (FIXED)
+     C) Generate enriched profile (CRITICAL FIX)
+  ------------------------------- */
+  let enrichedProfile: string;
+  try {
+    enrichedProfile = await generateEnrichedProfile(answers);
+  } catch {
+    enrichedProfile =
+      "A thoughtful person who values meaningful connection and authentic conversation.";
+  }
+
+  /* -------------------------------
+     D) Persist profile
   ------------------------------- */
   try {
     await upsertProfile({
       id: userId,
       name: name ?? null,
-      age: age ?? null,                     // ✅ NOW SAVED
+      age: age ?? null,
       photo_data_url: photoDataUrl ?? null,
 
       answers,
-      vibe_bio: vibeBio,                    // ✅ NOW SAVED CORRECTLY
-      enriched_profile: null,               // optional, not reused
+      vibe_bio: vibeBio,                 // short teaser
+      enriched_profile: enrichedProfile, // 🔥 REQUIRED FOR MATCH REASONING
 
       embedding,
       city: city ?? null,
       state: state ?? null,
       country: country ?? null,
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("❌ Onboarding save failed:", err);
     return res.status(500).json({ error: "Profile save failed" });
   }
 
   /* -------------------------------
-     D) Response
+     E) Response
   ------------------------------- */
   return res.json({
     userId,
