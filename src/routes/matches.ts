@@ -114,7 +114,7 @@
 //     id: m.id,
 //     name: m.name || "Match",
 //     similarity: matchPercent,
-//     photo:
+//     photoUrl:
 //       m.photo_data_url ||
 //       "https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=1600&auto=format&fit=crop",
 
