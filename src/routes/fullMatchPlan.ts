@@ -22,7 +22,7 @@ async function generateFullMatchPlan({
   city?: string;
 }) {
   // --------------------------------------------------
-  // 1️⃣ Fetch enriched profiles
+  // 1️⃣ Fetch vibe profiles
   // --------------------------------------------------
   const { data, error } = await supabase
     .from("profiles")
@@ -37,13 +37,40 @@ async function generateFullMatchPlan({
   const user = data.find((d) => d.id === userId);
   const match = data.find((d) => d.id === matchId);
 
+  const userProfile = user?.enriched_profile?.trim() || "";
+  const matchProfile = match?.enriched_profile?.trim() || "";
+
+  // Determine if we have enough signal to reason meaningfully
+  const hasEnoughSignal =
+    userProfile.length > 40 && matchProfile.length > 40;
+
   // --------------------------------------------------
-  // 2️⃣ Reasoning agent
+  // 2️⃣ Reasoning agent (GUARDED)
   // --------------------------------------------------
-  const reasoningPrompt = `
+  let reasoningParsed: {
+    whyTheyVibe: string;
+    sharedVibeTags: string[];
+  };
+
+  if (!hasEnoughSignal) {
+    // ✨ Brand-safe fallback (VERY IMPORTANT)
+    reasoningParsed = {
+      whyTheyVibe:
+        "Sometimes the good stuff isn’t obvious on paper — it shows up best when two people meet.",
+      sharedVibeTags: ["Curiosity", "Openness", "Discovery"],
+    };
+  } else {
+    const reasoningPrompt = `
 You are analyzing two people's vibe profiles.
-Write ONE short, warm sentence (max 25 words) explaining why they would naturally connect.
-Also list 2-3 short shared vibe tags (each 1–3 words).
+
+Write ONE warm, confident sentence (max 22 words) explaining why they would naturally connect.
+Then list 2–3 shared vibe tags (1–2 words each).
+
+STRICT RULES:
+- Do NOT mention missing information
+- Do NOT hedge
+- Do NOT say “insufficient data”
+- Do NOT explain uncertainty
 
 Return JSON only:
 {
@@ -52,28 +79,29 @@ Return JSON only:
 }
 
 Person A:
-${user?.enriched_profile}
+${userProfile}
 
 Person B:
-${match?.enriched_profile}
+${matchProfile}
 `;
 
-  const reasoningModel = genAI.getGenerativeModel({ model: MODEL_ID });
-  const reasoningResult = await reasoningModel.generateContent(reasoningPrompt);
-  let reasoningText = reasoningResult.response.text().trim();
+    const reasoningModel = genAI.getGenerativeModel({ model: MODEL_ID });
+    const reasoningResult = await reasoningModel.generateContent(reasoningPrompt);
+    let reasoningText = reasoningResult.response.text().trim();
 
-  if (reasoningText.startsWith("```")) {
-    reasoningText = reasoningText.replace(/```json|```/g, "").trim();
-  }
+    if (reasoningText.startsWith("```")) {
+      reasoningText = reasoningText.replace(/```json|```/g, "").trim();
+    }
 
-  let reasoningParsed: any;
-  try {
-    reasoningParsed = JSON.parse(reasoningText);
-  } catch {
-    reasoningParsed = {
-      whyTheyVibe: reasoningText,
-      sharedVibeTags: [],
-    };
+    try {
+      reasoningParsed = JSON.parse(reasoningText);
+    } catch {
+      reasoningParsed = {
+        whyTheyVibe:
+          "There’s a natural ease in how they approach connection and shared moments.",
+        sharedVibeTags: ["Ease", "Alignment"],
+      };
+    }
   }
 
   // --------------------------------------------------
@@ -81,11 +109,12 @@ ${match?.enriched_profile}
   // --------------------------------------------------
   const hangoutPrompt = `
 You are a creative planner for a vibe-based matching app.
-Given the personalities below, suggest 3 short, real-world hangout ideas that fit both of their shared energy and mood.
+
+Suggest 3 thoughtful, real-world first hangout ideas that fit both people.
 Each idea must include:
-- a descriptive title
-- a 1–2 sentence description
-- a specific place name or combination that exists in ${city || user?.city || "their city"}.
+- title
+- 1–2 sentence description
+- a real place name in ${city || user?.city || "their city"}
 
 Return JSON only:
 {
@@ -96,16 +125,16 @@ Return JSON only:
   ]
 }
 
-User A:
-${user?.enriched_profile}
+Person A:
+${userProfile}
 
-User B:
-${match?.enriched_profile}
+Person B:
+${matchProfile}
 `;
 
   const hangoutModel = genAI.getGenerativeModel({ model: MODEL_ID });
   const hangoutResult = await hangoutModel.generateContent(hangoutPrompt);
-  let hangoutText = hangoutResult.response.text();
+  let hangoutText = hangoutResult.response.text().trim();
 
   if (hangoutText.startsWith("```")) {
     hangoutText = hangoutText.replace(/```json|```/g, "").trim();
@@ -163,7 +192,8 @@ ${match?.enriched_profile}
   }
 
   return {
-    ...reasoningParsed,
+    whyTheyVibe: reasoningParsed.whyTheyVibe,
+    sharedVibeTags: reasoningParsed.sharedVibeTags,
     hangoutIdeas: mappedIdeas,
   };
 }
